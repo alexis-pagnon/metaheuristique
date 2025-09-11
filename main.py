@@ -4,7 +4,6 @@
 # 09/09/2025
 # --------------------------------------------------
 
-from xml.parsers.expat import model
 import docplex
 import docplex.mp
 import docplex.mp.model
@@ -14,7 +13,7 @@ airland_file = open("airlands/airland2.txt")
 m = 2  # Nombre de pistes d'atterrissage
 
 # Représenter la solution
-solution =  [ [] * m ] # Liste de m listes (1 liste par piste) avec l'ordre des avions qui y atterissent
+solution =  [ [] for _ in range(m) ] # Liste de m listes (1 liste par piste) avec l'ordre des avions qui y atterissent
 
 # Charger les données
 """
@@ -106,7 +105,6 @@ def decode(sequence):
             previous = i
     return x, cost, True
 
-
 def decode2(sequence):
     """
     Décodage d'une séquence d'atterrissage (on vérifie que la solution est possible et on calcule son coût)
@@ -148,6 +146,7 @@ def decode_docplex(sequence):
     """
     Décode une séquence d'atterrissage en trouvant les temps optimaux
     minimisant le coût avec Docplex.
+    Procedure to verify if a given solution is feasible or not
     """
     mdl = docplex.mp.model.Model("TempsSequence")
     
@@ -187,6 +186,38 @@ def decode_docplex(sequence):
 
 
 
-print(decode_docplex([[2,3,4,7,6,5,8,9,13,12,0,1,11,10,14]]))
+# print(decode_docplex([[2,3,4,7,6,5,8,9,13,12,0,1,11,10,14]]))
 
 # print(decode_docplex([[2,4,7,8,0,13,12,1,11,10],[3,5,6,9,14]]))
+
+
+
+def create_initial_solution() :
+    sequence = [ [] for _ in range(m)]
+    liste_avions = list(range(n))
+    liste_avions.sort(key=lambda x: T[x])
+
+    avions_restants = liste_avions.copy()
+    for r in range(m):
+        previous = None
+        for avion in avions_restants[:] :
+            if previous is None :
+                sequence[r].append(avion)
+                previous = avion
+                avions_restants.remove(avion)
+            else:
+                t = max(T[avion], T[previous]+s[previous][avion])
+                if t > L[avion]:
+                    continue
+                else:
+                    sequence[r].append(avion)
+                    previous = avion
+                    avions_restants.remove(avion)
+    return sequence
+
+# solution_initiale = create_initial_solution()
+# print("Solution initiale : ", solution_initiale)
+# print(decode_docplex(solution_initiale))
+
+
+# TODO : Générer voisins -> Local Search (swap, relocate, move_between_runways, stop criteria), VNS, Tabu Search
