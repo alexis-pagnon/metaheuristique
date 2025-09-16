@@ -4,6 +4,7 @@
 # 09/09/2025
 # --------------------------------------------------
 
+from pyexpat import model
 import time
 import docplex
 import docplex.mp
@@ -12,8 +13,8 @@ import random
 import copy
 
 # Ouvrir le fichier avec nos variables (code récupéré du projet de S8)
-airland_file = open("airlands/airland2.txt")
-m = 2  # Nombre de pistes d'atterrissage
+airland_file = open("airlands/airland9.txt")
+m = 3  # Nombre de pistes d'atterrissage
 
 # Représenter la solution
 solution =  [ [] for _ in range(m) ] # Liste de m listes (1 liste par piste) avec l'ordre des avions qui y atterissent
@@ -66,49 +67,12 @@ for i in range(0, n):
 
 airland_file.close()
 
-
-#### AFFICHAGE DES RÉSULTATS #####
 print(f"Nombre d'avions: {n}")
-# print(f"Heures d'atterrissage au plus tôt: {E}")
-# print(f"Heures d'atterrissage cibles: {T}")
-# print(f"Heures d'atterrissage au plus tard: {L}")
-# print(f"Coûts de pénalité pour atterrissage avant la cible: {c_minus}")
-# print(f"Coûts de pénalité pour atterrissage après la cible: {c_plus}")
-# print(f"Exemple de temps de séparation (premier avion): {s[0]}")
 
-def genererSequence() :
-    return 0
+#### RECHERCHE METAHEURISTIQUE #####
 
-def decode(sequence): 
-    """
-    Décodage d'une séquence d'atterrissage (on vérifie que la solution est possible et on calcule son coût)
-    Retourne :
-        x : dictionnaire des temps d'atterrissage
-        cost : coût total de la séquence (infini si infaisable)
-        feasible : booléen indiquant si la séquence est faisable
-    """
-    x = {}
-    cost = 0
-    for r in sequence:
-        previous = None
-        for i in r:
-            
-            if previous is None:
-                t = max(E[i], 0)
-            else:
-                t = max(E[i], x[previous] + s[previous][i])
-            if t > L[i]:  # infaisable
-                return x, float("inf"), False
-            x[i] = t
-            # coût = avance ou retard
-            if t < T[i]:
-                cost += c_minus[i] * (T[i] - t)
-            else:
-                cost += c_plus[i] * (t - T[i])
-            previous = i
-    return x, cost, True
 
-def decode2(sequence):
+def decode(sequence):
     """
     Décodage d'une séquence d'atterrissage (on vérifie que la solution est possible et on calcule son coût)
     Retourne :
@@ -150,7 +114,6 @@ def decode_docplex(sequence):
     """
     Décode une séquence d'atterrissage en trouvant les temps optimaux
     minimisant le coût avec Docplex.
-    Procedure to verify if a given solution is feasible or not
     """
     mdl = docplex.mp.model.Model("TempsSequence")
     
@@ -190,13 +153,11 @@ def decode_docplex(sequence):
 
 
 # print(decode_docplex([[2,3,4,7,6,5,8,9,13,12,0,1,11,10,14]]))
-
 # print(decode_docplex([[2,4,7,8,0,13,12,1,11,10],[3,5,6,9,14]]))
-
 # print(decode_docplex([[0, 7, 3, 9, 8, 10, 2, 19, 1, 6, 14, 4, 23, 17, 13, 22, 16, 49, 25, 24, 42, 15, 21, 43, 48, 27, 31, 28, 46, 33, 37, 20, 38, 45, 35, 39, 41], [5, 11, 18, 12, 34, 26, 44, 32, 36, 47, 29, 30, 40]]))
 
-def create_initial_solution() :
-    """ Créer une solution initiale non optimisée (On prend la première qui est faisable) """
+def create_initial_solution() -> list :
+    """ Retourne une solution initiale non optimisée (on prend la première qui est faisable)"""
     sequence = [ [] for _ in range(m)]
     liste_avions = list(range(n))
     liste_avions.sort(key=lambda x: T[x])
@@ -224,13 +185,10 @@ def create_initial_solution() :
 # print(decode_docplex(solution_initiale))
 
 
-# TODO : Générer voisins -> Local Search (swap, relocate, move_between_runways, stop criteria), VNS, Tabu Search
-# Possible d'implémenter l'approximation pour comparer avec docplex le résultat final
-
-def relocate_intra(seq, r, i, j)->list:
+def relocate_intra(seq, r, i, j) -> list:
     """ 
     Retire l'avion d'indice 'i' de la piste 'r' et le réinsère sur celle-ci à l'indice 'j'.
-    Renvoie la nouvelle séquence trouvée.
+    Retourne la nouvelle séquence trouvée.
     """
     new_seq = copy.deepcopy(seq)
 
@@ -246,10 +204,10 @@ def relocate_intra(seq, r, i, j)->list:
     return new_seq
 
 
-def move_between(seq, r1, r2, i1, i2)->list:
+def move_between(seq, r1, r2, i1, i2) -> list:
     """ 
-    Déplace l'avion d'indice i1 de la piste r1 vers la piste r2, à l'indice i2 
-    Renvoie la nouvelle séquence trouvée.
+    Déplace l'avion d'indice i1 de la piste r1 vers la piste r2, à l'indice i2.
+    Retourne la nouvelle séquence trouvée.
     """
     new_seq = copy.deepcopy(seq)
 
@@ -275,7 +233,7 @@ def LS1(seq, t_debut, t_max):
     """
                 
     best_seq = seq
-    _, initial_cost, _ = decode_docplex(best_seq)
+    _, initial_cost, _ = decode(best_seq)
     best_cost = initial_cost
 
     # Condition d'arrêt temporelle
@@ -291,8 +249,8 @@ def LS1(seq, t_debut, t_max):
 
     # On calcul le coût de chacunes des séquences trouvées afin de garder la meilleure
     for voisin in neighborhoods:
-        _, new_cost, new_feasible = decode_docplex(voisin)
-        if new_feasible and new_cost < best_cost:
+        _, new_cost, new_feasible = decode(voisin)
+        if new_feasible and new_cost <= best_cost:
             best_seq, best_cost = voisin, new_cost
 
     if(best_cost < initial_cost):
@@ -308,23 +266,128 @@ def LS1(seq, t_debut, t_max):
 
 
 
-def LS2(seq, max_iter = 100):
+def LS2(seq, t_debut, t_max):
     """ 
-    Algorithme de Local Search permettant à partir d'une séquence donnée de nous renvoyer la meilleure solution trouvée 
-    lorsque l'on atteint le nombre maximum d'itérations donné. Elle effectue à chaque fois les 3 types de voisnages différents.
+    Algorithme de Local Search 2 permettant à partir d'une séquence donnée de nous renvoyer la meilleure solution (séquence et coût) 
+    trouvée dans un temps imparti. Elle crée le voisinage en faisant toutes les combinaisaisons possibles entre les pistes.
     """
     best_seq = seq
-    _, best_cost, feasible = decode_docplex(best_seq)
+    _, initial_cost, _ = decode(best_seq)
+    best_cost = initial_cost
 
-    # On regarde dans un premier temps si c'est faisable
-    if not feasible:
-        return best_seq, float("inf")
+    # Condition d'arrêt temporelle
+    if(t_debut + t_max < time.time()):
+        return best_seq, best_cost
     
-    # On cherche une solution optimale tant que nous n'avons pas atteint le max d'itérations souhaité
+    # On crée notre voisinage 2 : combinaisons entre-pistes
+    neighborhoods = []
+    for r1 in range(m):
+        for r2 in range(m):
+            if r1 != r2:
+                for i1 in range(len(seq[r1])):
+                    for i2 in range(len(seq[r2])+1):
+                        neighborhoods.append(move_between(seq, r1, r2, i1, i2))
+
+    # On calcul le coût de chacunes des séquences trouvées afin de garder la meilleure
+    for voisin in neighborhoods:
+        _, new_cost, new_feasible = decode(voisin)
+        if new_feasible and new_cost <= best_cost:
+            best_seq, best_cost = voisin, new_cost
+
+    if(best_cost < initial_cost):
+        return LS2(best_seq, t_debut, t_max)
+    else:
+        return best_seq, best_cost
+
+# Optimal à retrouver : [[2,4,7,8,0,13,12,1,11,10],[3,5,6,9,14]]
+# print(LS2([[2,4,7,0,13,12,6,1,11,10],[3,5,9,8,14]], time.time(), 100))
+
+def shaking(seq, k):
+
+    new_seq = copy.deepcopy(seq)
+
+    for _ in range(k):
+        for i in range(m):
+            for j in range(len(seq[i])): # TODO PROBLEME ICI LA car len change en cours de route
+                new_i = random.randint(0, len(new_seq) - 1)
+                new_j = random.randint(0, len(new_seq[i]) - 1)
+                new_seq = move_between(new_seq, i, new_i, j, new_j)
+                
+    return new_seq
+
+def VND(seq, t_debut, t_max):
+    """
+    Algorithme VND permettant à partir d'une séquence donnée de nous renvoyer la meilleure solution (séquence et coût) 
+    trouvée dans un temps imparti. Pour cela, elle utilise les algorithmes LS1 et LS2 jusqu'à ne plus réussir à améliorer le coût.
+    """
+
+    _, _, best_cost2 = decode(seq)
+    best_seq2 = seq
+
+    # On exécute LS1 puis LS2 avec le résultat du LS1, et ce, tant que le coût peut être amélioré
+    while(t_debut + t_max > time.time()):
+        print("LS1")
+        best_seq1, best_cost1 = LS1(best_seq2, t_debut, t_max)
+        print(best_cost1)
+
+        # Si les séquences sont égales (aucune amélioration), on arrête la boucle
+        if(best_seq1 == best_seq2):
+            print("break1")
+            break
+
+        print("LS2")
+        best_seq2, best_cost2 = LS2(best_seq1, t_debut, t_max)
+        print(best_cost2)
+        
+        # Si les séquences sont égales (aucune amélioration), on arrête la boucle
+        if(best_seq1 == best_seq2):
+            print("break2")
+            break
+    
+    print(time.time() - t_debut)
+    if(best_cost1 < best_cost2):
+        return best_seq1, best_cost1
+    else:
+        return best_seq2, best_cost2
+    
+# solution_initiale = create_initial_solution()
+# seq_solution, cost = VND(solution_initiale, time.time(), 120)
+
+# x_vals, real_cost, _ = decode_docplex(seq_solution)
+
+# print(seq_solution, cost)
+# print(f"Calcul du coût réel avec cplex : {real_cost}")
 
 
-    return best_seq, best_cost
+def VNS(t_max, k_max):
+    x = create_initial_solution()
+    k = 1
+    t_debut = time.time()
+    while(k <= k_max and (t_debut + t_max > time.time())):
+        x_prime = shaking(x, k)
+        x_prime_prime = VND(x_prime, t_debut, t_max)
+        _, x_cost, _ = decode(x)
+        _, x_prime_prime_cost, _ = decode(x_prime_prime)
+        if(x_prime_prime_cost < x_cost):
+            x = x_prime_prime
+            k = 1
+        else:
+            k += 1
 
+
+print(VNS(240, 3))
+
+
+# print("\nHeures d'atterrissage optimales :")
+# for i in range(n):
+#     x_val = x_vals[i]
+#     assigned_runway = next(r for r in range(m) if i in seq_solution[r])  # Trouver la piste assignée
+#     status = "a l'heure"
+#     if(x_val < T[i]):
+#         status = f"en avance de {T[i] - x_val:.2f}"
+#     elif(x_val > T[i]):
+#         status = f"en retard de {x_val - T[i]:.2f}"
+#     print(f"Avion {i}: atterrissage à {x_val:.2f} ({status}) sur la piste {assigned_runway}")
 
 
 # Dans rapport, parler de l'approximation dans les limites.
