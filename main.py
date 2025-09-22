@@ -13,8 +13,8 @@ import random
 import copy
 
 # Ouvrir le fichier avec nos variables (code récupéré du projet de S8)
-airland_file = open("airlands/airland9.txt")
-m = 3  # Nombre de pistes d'atterrissage
+airland_file = open("airlands/airland8.txt")
+m = 2  # Nombre de pistes d'atterrissage
 
 # Représenter la solution
 solution =  [ [] for _ in range(m) ] # Liste de m listes (1 liste par piste) avec l'ordre des avions qui y atterissent
@@ -88,6 +88,10 @@ def decode(sequence):
             # temps le plus tôt possible selon les contraintes
             t_min = E[i] if previous is None else max(E[i], x[previous] + s[previous][i])
             t_max = L[i]
+
+            # infaisable si t_min > t_max
+            if t_min > t_max :
+                return {}, float("inf"), False
 
             # choisir le temps le plus proche de T[i] dans [t_min, t_max]
             if T[i] < t_min:
@@ -305,13 +309,16 @@ def LS2(seq, t_debut, t_max):
 def shaking(seq, k):
 
     new_seq = copy.deepcopy(seq)
-
+    
     for _ in range(k):
-        for i in range(m):
-            for j in range(len(seq[i])): # TODO PROBLEME ICI LA car len change en cours de route
-                new_i = random.randint(0, len(new_seq) - 1)
-                new_j = random.randint(0, len(new_seq[i]) - 1)
-                new_seq = move_between(new_seq, i, new_i, j, new_j)
+        
+        i = random.randint(0, m - 1)
+        j = random.randint(0, len(new_seq[i]) - 1) if len(new_seq[i]) > 0 else 0
+        
+        new_i = random.randint(0, m - 1)
+        new_j = random.randint(0, len(new_seq[new_i]) - 1) if len(new_seq[new_i]) > 0 else 0
+
+        new_seq = move_between(new_seq, i, new_i, j, new_j)
                 
     return new_seq
 
@@ -365,7 +372,8 @@ def VNS(t_max, k_max):
     t_debut = time.time()
     while(k <= k_max and (t_debut + t_max > time.time())):
         x_prime = shaking(x, k)
-        x_prime_prime = VND(x_prime, t_debut, t_max)
+        x_prime_prime, _ = VND(x_prime, t_debut, t_max)
+        # print(f"x prime prime : {x_prime_prime}")
         _, x_cost, _ = decode(x)
         _, x_prime_prime_cost, _ = decode(x_prime_prime)
         if(x_prime_prime_cost < x_cost):
@@ -373,21 +381,21 @@ def VNS(t_max, k_max):
             k = 1
         else:
             k += 1
+    return x
 
-
-print(VNS(240, 3))
+print(decode_docplex(VNS(120, n//2)))
 
 
 # print("\nHeures d'atterrissage optimales :")
 # for i in range(n):
-#     x_val = x_vals[i]
-#     assigned_runway = next(r for r in range(m) if i in seq_solution[r])  # Trouver la piste assignée
-#     status = "a l'heure"
-#     if(x_val < T[i]):
-#         status = f"en avance de {T[i] - x_val:.2f}"
-#     elif(x_val > T[i]):
-#         status = f"en retard de {x_val - T[i]:.2f}"
-#     print(f"Avion {i}: atterrissage à {x_val:.2f} ({status}) sur la piste {assigned_runway}")
+#      x_val = x_vals[i]
+#      assigned_runway = next(r for r in range(m) if i in seq_solution[r])  # Trouver la piste assignée
+#      status = "a l'heure"
+#      if(x_val < T[i]):
+#          status = f"en avance de {T[i] - x_val:.2f}"
+#      elif(x_val > T[i]):
+#          status = f"en retard de {x_val - T[i]:.2f}"
+#      print(f"Avion {i}: atterrissage à {x_val:.2f} ({status}) sur la piste {assigned_runway}")
 
 
 # Dans rapport, parler de l'approximation dans les limites.
