@@ -4,7 +4,7 @@
 # 09/09/2025
 # --------------------------------------------------
 
-from pyexpat import model
+
 import time
 import docplex
 import docplex.mp
@@ -13,8 +13,8 @@ import random
 import copy
 
 # Ouvrir le fichier avec nos variables (code récupéré du projet de S8)
-airland_file = open("airlands/airland8.txt")
-m = 2  # Nombre de pistes d'atterrissage
+airland_file = open("airlands/airland13.txt")
+m = 5  # Nombre de pistes d'atterrissage
 
 # Représenter la solution
 solution =  [ [] for _ in range(m) ] # Liste de m listes (1 liste par piste) avec l'ordre des avions qui y atterissent
@@ -249,18 +249,16 @@ def LS1(seq, t_debut, t_max):
     for r in range(m):
         for i in range(len(seq[r])):
             for j in range(i+1, len(seq[r])):
-                neighborhoods.append(relocate_intra(seq, r, i, j))
+                voisin = relocate_intra(seq, r, i, j)
+                neighborhoods.append(voisin)
 
     # On calcul le coût de chacunes des séquences trouvées afin de garder la meilleure
     for voisin in neighborhoods:
         _, new_cost, new_feasible = decode(voisin)
-        if new_feasible and new_cost <= best_cost:
+        if new_feasible and new_cost < best_cost:
             best_seq, best_cost = voisin, new_cost
-
-    if(best_cost < initial_cost):
-        return LS1(best_seq, t_debut, t_max)
-    else:
-        return best_seq, best_cost
+    
+    return best_seq, best_cost
 
 
 # print(LS1([[2,7,8,0,13,4,11,1,12,10],[3,5,6,9,14]], time.time(), 10))
@@ -292,16 +290,15 @@ def LS2(seq, t_debut, t_max):
                     for i2 in range(len(seq[r2])+1):
                         neighborhoods.append(move_between(seq, r1, r2, i1, i2))
 
+    # print(f"Nombre de voisins : {len(neighborhoods)}")
+
     # On calcul le coût de chacunes des séquences trouvées afin de garder la meilleure
     for voisin in neighborhoods:
         _, new_cost, new_feasible = decode(voisin)
-        if new_feasible and new_cost <= best_cost:
+        if new_feasible and new_cost < best_cost:
             best_seq, best_cost = voisin, new_cost
 
-    if(best_cost < initial_cost):
-        return LS2(best_seq, t_debut, t_max)
-    else:
-        return best_seq, best_cost
+    return best_seq, best_cost
 
 # Optimal à retrouver : [[2,4,7,8,0,13,12,1,11,10],[3,5,6,9,14]]
 # print(LS2([[2,4,7,0,13,12,6,1,11,10],[3,5,9,8,14]], time.time(), 100))
