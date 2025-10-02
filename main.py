@@ -13,8 +13,8 @@ import random
 import copy
 
 # Ouvrir le fichier avec nos variables (code récupéré du projet de S8)
-airland_file = open("airlands/airland13.txt")
-m = 5  # Nombre de pistes d'atterrissage
+airland_file = open("airlands/airland8.txt")
+m = 2  # Nombre de pistes d'atterrissage
 
 # Représenter la solution
 solution =  [ [] for _ in range(m) ] # Liste de m listes (1 liste par piste) avec l'ordre des avions qui y atterissent
@@ -225,7 +225,7 @@ def move_between(seq, r1, r2, i1, i2) -> list:
     plane = new_seq[r1].pop(i1)
 
     # Puis on le replace à l'emplacement i2 sur la seconde piste r2
-    new_seq[r2].insert(i2, plane)
+    new_seq[r2].insert(i2, plane) # Si i2 est plus grand que la taille de la liste, l'élément est ajouté à la fin
 
     return new_seq
 
@@ -235,6 +235,9 @@ def LS1(seq, t_debut, t_max):
     Algorithme de Local Search permettant à partir d'une séquence donnée de nous renvoyer la meilleure solution (séquence et coût) 
     trouvée dans un temps imparti. Elle crée le voisinage en faisant toutes les combinaisaisons possibles pour chacunes des pistes indépendamment.
     """
+
+
+    
                 
     best_seq = seq
     _, initial_cost, _ = decode(best_seq)
@@ -244,6 +247,7 @@ def LS1(seq, t_debut, t_max):
     if(t_debut + t_max < time.time()):
         return best_seq, best_cost
     
+    count = 0
     # On crée notre voisinage 
     neighborhoods = []
     for r in range(m):
@@ -252,11 +256,27 @@ def LS1(seq, t_debut, t_max):
                 voisin = relocate_intra(seq, r, i, j)
                 neighborhoods.append(voisin)
 
+                count += 1
+                # First improvement : -> plus rapide
+
+                _, new_cost, new_feasible = decode(voisin)
+                if new_feasible:
+                    if new_cost < best_cost:
+                        best_seq, best_cost = voisin, new_cost
+                        print(count)
+                        return best_seq, best_cost
+                else:
+                    # Trouver une solution miracle
+                    break
+
+
+    # Best improvement : -> beaucoup + lent
+
     # On calcul le coût de chacunes des séquences trouvées afin de garder la meilleure
-    for voisin in neighborhoods:
-        _, new_cost, new_feasible = decode(voisin)
-        if new_feasible and new_cost < best_cost:
-            best_seq, best_cost = voisin, new_cost
+    # for voisin in neighborhoods:
+    #     _, new_cost, new_feasible = decode(voisin)
+    #     if new_feasible and new_cost < best_cost:
+    #         best_seq, best_cost = voisin, new_cost
     
     return best_seq, best_cost
 
@@ -270,7 +290,7 @@ def LS1(seq, t_debut, t_max):
 
 def LS2(seq, t_debut, t_max):
     """ 
-    Algorithme de Local Search 2 permettant à partir d'une séquence donnée de nous renvoyer la meilleure solution (séquence et coût) 
+    Algorithme de Local Search permettant à partir d'une séquence donnée de nous renvoyer la meilleure solution (séquence et coût) 
     trouvée dans un temps imparti. Elle crée le voisinage en faisant toutes les combinaisaisons possibles entre les pistes.
     """
     best_seq = seq
@@ -281,22 +301,39 @@ def LS2(seq, t_debut, t_max):
     if(t_debut + t_max < time.time()):
         return best_seq, best_cost
     
-    # On crée notre voisinage 2 : combinaisons entre-pistes
+    count = 0
+    # On crée notre voisinage : combinaisons entre-pistes
     neighborhoods = []
     for r1 in range(m):
         for r2 in range(m):
-            if r1 != r2:
-                for i1 in range(len(seq[r1])):
-                    for i2 in range(len(seq[r2])+1):
-                        neighborhoods.append(move_between(seq, r1, r2, i1, i2))
+            # if r1 != r2:
+            for i1 in range(1, len(seq[r1])-1, 2):
+                # for i2 in range(len(seq[r2])+1):
 
-    # print(f"Nombre de voisins : {len(neighborhoods)}")
+                # On permute les avions avec leurs positions adjacentes 
+                # (même si les pistes sont différentes car on place à peu près au même endroit dans la nouvelle piste)
+                
+                for di in [-1,1]: # Place avant et place après
+                    voisin = move_between(seq, r1, r2, i1, i1+di)
+                    neighborhoods.append(voisin)
+                    count += 1
+                    # First improvement : -> plus rapide
+                    _, new_cost, new_feasible = decode(voisin)
+                    if new_feasible and new_cost < best_cost:
+                        best_seq, best_cost = voisin, new_cost
+                        print(count)
+                        return best_seq, best_cost
+
+
+                        
+                    
+    # Best improvement : -> beaucoup + lent mais trouve de meilleures solutions
 
     # On calcul le coût de chacunes des séquences trouvées afin de garder la meilleure
-    for voisin in neighborhoods:
-        _, new_cost, new_feasible = decode(voisin)
-        if new_feasible and new_cost < best_cost:
-            best_seq, best_cost = voisin, new_cost
+    # for voisin in neighborhoods:
+    #     _, new_cost, new_feasible = decode(voisin)
+    #     if new_feasible and new_cost < best_cost:
+    #         best_seq, best_cost = voisin, new_cost
 
     return best_seq, best_cost
 
@@ -319,40 +356,43 @@ def shaking(seq, k):
                 
     return new_seq
 
+
 def VND(seq, t_debut, t_max):
     """
     Algorithme VND permettant à partir d'une séquence donnée de nous renvoyer la meilleure solution (séquence et coût) 
     trouvée dans un temps imparti. Pour cela, elle utilise les algorithmes LS1 et LS2 jusqu'à ne plus réussir à améliorer le coût.
     """
 
-    _, _, best_cost2 = decode(seq)
-    best_seq2 = seq
+    _, best_cost, _ = decode(seq)
+    best_seq = seq
 
     # On exécute LS1 puis LS2 avec le résultat du LS1, et ce, tant que le coût peut être amélioré
     while(t_debut + t_max > time.time()):
-        print("LS1")
-        best_seq1, best_cost1 = LS1(best_seq2, t_debut, t_max)
-        print(best_cost1)
+        # print("LS1")
+        # best_seq1, best_cost1 = LS1(best_seq2, t_debut, t_max)
+        # print(best_cost1)
 
-        # Si les séquences sont égales (aucune amélioration), on arrête la boucle
-        if(best_seq1 == best_seq2):
-            print("break1")
-            break
+        # # Si les séquences sont égales (aucune amélioration), on arrête la boucle
+        # if(best_seq1 == best_seq2):
+        #     print("break1")
+        #     break
 
         print("LS2")
-        best_seq2, best_cost2 = LS2(best_seq1, t_debut, t_max)
-        print(best_cost2)
+        new_seq, new_cost = LS2(best_seq, t_debut, t_max)
+        print(best_cost)
         
         # Si les séquences sont égales (aucune amélioration), on arrête la boucle
-        if(best_seq1 == best_seq2):
+        if(new_cost < best_cost):
+            best_seq, best_cost = new_seq, new_cost
+        else:
             print("break2")
             break
     
     print(time.time() - t_debut)
-    if(best_cost1 < best_cost2):
-        return best_seq1, best_cost1
+    if(new_cost < best_cost):
+        return new_seq, new_cost
     else:
-        return best_seq2, best_cost2
+        return best_seq, best_cost
     
 # solution_initiale = create_initial_solution()
 # seq_solution, cost = VND(solution_initiale, time.time(), 120)
@@ -373,6 +413,7 @@ def VNS(t_max, k_max):
         # print(f"x prime prime : {x_prime_prime}")
         _, x_cost, _ = decode(x)
         _, x_prime_prime_cost, _ = decode(x_prime_prime)
+        print(f"coût voisin : {x_prime_prime_cost}")
         if(x_prime_prime_cost < x_cost):
             x = x_prime_prime
             k = 1
@@ -380,8 +421,11 @@ def VNS(t_max, k_max):
             k += 1
     return x
 
-print(decode_docplex(VNS(120, n//2)))
+seq = VNS(120, n)
+print(decode_docplex(seq))
+# print(decode(seq))
 
+# TODO : check si le shaking fonctionne bien
 
 # print("\nHeures d'atterrissage optimales :")
 # for i in range(n):
